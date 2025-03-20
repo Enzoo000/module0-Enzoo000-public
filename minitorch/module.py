@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 from typing import Any, Dict, Optional, Sequence, Tuple
 
 
@@ -12,7 +11,6 @@ class Module:
         _modules : Storage of the child modules
         _parameters : Storage of the module's parameters
         training : Whether the module is in training mode or evaluation mode
-
     """
 
     _modules: Dict[str, Module]
@@ -26,34 +24,38 @@ class Module:
 
     def modules(self) -> Sequence[Module]:
         """Return the direct child modules of this module."""
-        m: Dict[str, Module] = self.__dict__["_modules"]
-        return list(m.values())
+        return list(self._modules.values())
 
     def train(self) -> None:
         """Set the mode of this module and all descendent modules to `train`."""
-        # TODO: Implement for Task 0.4.
-        raise NotImplementedError("Need to implement for Task 0.4")
+        self.training = True
+        for module in self._modules.values():
+            module.train()
 
     def eval(self) -> None:
         """Set the mode of this module and all descendent modules to `eval`."""
-        # TODO: Implement for Task 0.4.
-        raise NotImplementedError("Need to implement for Task 0.4")
+        self.training = False
+        for module in self._modules.values():
+            module.eval()
 
     def named_parameters(self) -> Sequence[Tuple[str, Parameter]]:
         """Collect all the parameters of this module and its descendents.
 
         Returns
         -------
-            The name and `Parameter` of each ancestor parameter.
-
+            A list of tuples containing parameter names and Parameter objects.
         """
-        # TODO: Implement for Task 0.4.
-        raise NotImplementedError("Need to implement for Task 0.4")
+        params = list(self._parameters.items())
+
+        for name, module in self._modules.items():
+            for sub_name, sub_param in module.named_parameters():
+                params.append((f"{name}.{sub_name}", sub_param))
+
+        return params
 
     def parameters(self) -> Sequence[Parameter]:
         """Enumerate over all the parameters of this module and its descendents."""
-        # TODO: Implement for Task 0.4.
-        raise NotImplementedError("Need to implement for Task 0.4")
+        return [param for _, param in self.named_parameters()]
 
     def add_parameter(self, k: str, v: Any) -> Parameter:
         """Manually add a parameter. Useful helper for scalar parameters.
@@ -66,26 +68,24 @@ class Module:
         Returns:
         -------
             Newly created parameter.
-
         """
         val = Parameter(v, k)
-        self.__dict__["_parameters"][k] = val
+        self._parameters[k] = val
         return val
 
-    def __setattr__(self, key: str, val: Parameter) -> None:
+    def __setattr__(self, key: str, val: Any) -> None:
         if isinstance(val, Parameter):
-            self.__dict__["_parameters"][key] = val
+            self._parameters[key] = val
         elif isinstance(val, Module):
-            self.__dict__["_modules"][key] = val
+            self._modules[key] = val
         else:
             super().__setattr__(key, val)
 
     def __getattr__(self, key: str) -> Any:
-        if key in self.__dict__["_parameters"]:
-            return self.__dict__["_parameters"][key]
-
-        if key in self.__dict__["_modules"]:
-            return self.__dict__["_modules"][key]
+        if key in self._parameters:
+            return self._parameters[key]
+        if key in self._modules:
+            return self._modules[key]
         return None
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
@@ -103,16 +103,14 @@ class Module:
             return s
 
         child_lines = []
-
         for key, module in self._modules.items():
             mod_str = repr(module)
             mod_str = _addindent(mod_str, 2)
-            child_lines.append("(" + key + "): " + mod_str)
+            child_lines.append(f"({key}): {mod_str}")
         lines = child_lines
 
         main_str = self.__class__.__name__ + "("
         if lines:
-            # simple one-liner info, which most builtin Modules will use
             main_str += "\n  " + "\n  ".join(lines) + "\n"
 
         main_str += ")"
